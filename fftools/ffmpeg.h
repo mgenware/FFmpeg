@@ -742,65 +742,65 @@ typedef struct FrameData {
     int                 nb_side_data;
 } FrameData;
 
-extern InputFile   **input_files;
-extern int        nb_input_files;
+extern _Thread_local InputFile   **input_files;
+extern _Thread_local int        nb_input_files;
 
-extern OutputFile   **output_files;
-extern int         nb_output_files;
+extern _Thread_local OutputFile   **output_files;
+extern _Thread_local int         nb_output_files;
 
 // complex filtergraphs
-extern FilterGraph **filtergraphs;
-extern int        nb_filtergraphs;
+extern _Thread_local FilterGraph **filtergraphs;
+extern _Thread_local int        nb_filtergraphs;
 
 // standalone decoders (not tied to demuxed streams)
-extern Decoder     **decoders;
-extern int        nb_decoders;
+extern _Thread_local  Decoder     **decoders;
+extern _Thread_local  int        nb_decoders;
 
-extern char *vstats_filename;
+extern _Thread_local char *vstats_filename;
 
-extern float dts_delta_threshold;
-extern float dts_error_threshold;
+extern _Thread_local float dts_delta_threshold;
+extern _Thread_local float dts_error_threshold;
 
-extern enum VideoSyncMethod video_sync_method;
-extern float frame_drop_threshold;
-extern int do_benchmark;
-extern int do_benchmark_all;
-extern int do_hex_dump;
-extern int do_pkt_dump;
-extern int copy_ts;
-extern int start_at_zero;
-extern int copy_tb;
-extern int debug_ts;
-extern int exit_on_error;
-extern int abort_on_flags;
-extern int print_stats;
-extern int64_t stats_period;
-extern int stdin_interaction;
-extern AVIOContext *progress_avio;
-extern float max_error_rate;
+extern _Thread_local enum VideoSyncMethod video_sync_method;
+extern _Thread_local float frame_drop_threshold;
+extern _Thread_local int do_benchmark;
+extern _Thread_local int do_benchmark_all;
+extern _Thread_local int do_hex_dump;
+extern _Thread_local int do_pkt_dump;
+extern _Thread_local int copy_ts;
+extern _Thread_local int start_at_zero;
+extern _Thread_local int copy_tb;
+extern _Thread_local int debug_ts;
+extern _Thread_local int exit_on_error;
+extern _Thread_local int abort_on_flags;
+extern _Thread_local int print_stats;
+extern _Thread_local int64_t stats_period;
+extern _Thread_local int stdin_interaction;
+extern _Thread_local AVIOContext *progress_avio;
+extern _Thread_local float max_error_rate;
 
-extern char *filter_nbthreads;
-extern int filter_complex_nbthreads;
-extern int filter_buffered_frames;
-extern int vstats_version;
-extern int print_graphs;
-extern char *print_graphs_file;
-extern char *print_graphs_format;
-extern int auto_conversion_filters;
+extern _Thread_local char *filter_nbthreads;
+extern _Thread_local int filter_complex_nbthreads;
+extern _Thread_local int filter_buffered_frames;
+extern _Thread_local int vstats_version;
+extern _Thread_local int print_graphs;
+extern _Thread_local char *print_graphs_file;
+extern _Thread_local char *print_graphs_format;
+extern _Thread_local int auto_conversion_filters;
 
-extern const AVIOInterruptCB int_cb;
+extern const _Thread_local AVIOInterruptCB int_cb;
 
-extern const OptionDef options[];
-extern HWDevice *filter_hw_device;
+extern _Thread_local const OptionDef *options;
+extern _Thread_local HWDevice *filter_hw_device;
 
-extern atomic_uint nb_output_dumped;
+extern _Thread_local atomic_uint nb_output_dumped;
 
-extern int ignore_unknown_streams;
-extern int copy_unknown_streams;
+extern _Thread_local int ignore_unknown_streams;
+extern _Thread_local int copy_unknown_streams;
 
-extern int recast_media;
+extern _Thread_local int recast_media;
 
-extern FILE *vstats_file;
+extern _Thread_local FILE *vstats_file;
 
 void term_init(void);
 void term_exit(void);
@@ -853,6 +853,8 @@ void fg_send_command(FilterGraph *fg, double time, const char *target,
                      const char *command, const char *arg, int all_filters);
 
 int ffmpeg_parse_options(int argc, char **argv, Scheduler *sch);
+
+void mg_create_options(void);
 
 void enc_stats_write(OutputStream *ost, EncStats *es,
                      const AVFrame *frame, const AVPacket *pkt,
@@ -985,5 +987,9 @@ int view_specifier_parse(const char **pspec, ViewSpecifier *vs);
 
 int muxer_thread(void *arg);
 int encoder_thread(void *arg);
+
+typedef void (*FFmpegProgressCallback)(const uint8_t* data, int size);
+
+int ffmpeg_run(int argc, char **argv, FFmpegProgressCallback progress_cb);
 
 #endif /* FFTOOLS_FFMPEG_H */

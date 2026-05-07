@@ -138,16 +138,25 @@ include $(SRC_PATH)/doc/examples/Makefile
 $(ALLFFLIBS:%=lib%/version.o): libavutil/ffversion.h
 
 $(PROGS): %$(PROGSSUF)$(EXESUF): %$(PROGSSUF)_g$(EXESUF)
-ifeq ($(STRIPTYPE),direct)
-	$(STRIP) -o $@ $<
-else
-	$(RM) $@
-	$(CP) $< $@
-	$(STRIP) $@
-endif
+	echo "--> Finished target $@..."
+# ifeq ($(STRIPTYPE),direct)
+# 	$(STRIP) -o $@ $<
+# else
+# 	$(RM) $@
+# 	$(CP) $< $@
+# 	$(STRIP) $@
+# endif
 
 %$(PROGSSUF)_g$(EXESUF): $(FF_DEP_LIBS)
-	$(call LINK,$(LDFLAGS) $(LDEXEFLAGS) $(LD_O) $(OBJS-$*) $(FF_EXTRALIBS))
+	echo '--> FF_DEP_LIBS: $(FF_DEP_LIBS), FF_EXTRALIBS: $(FF_EXTRALIBS)'
+	echo "--> OUTFILE: $(prefix)/lib/$(KU_TARGET_LIB_FILENAME)"
+	mkdir -p "$(prefix)/lib"
+ifeq ($(KU_SDK),android)
+	$(LD) -shared -Wl,-soname,$(KU_TARGET_LIB_FILENAME) $(LDFLAGS) $(LDSOFLAGS) -o "$(prefix)/lib/$(KU_TARGET_LIB_FILENAME)" $(OBJS-$*) $(FF_EXTRALIBS)
+else
+	$(LD) -dynamiclib "-Wl,-install_name,@rpath/$(KU_TARGET_LIB_NAME).framework/$(KU_TARGET_LIB_NAME),-current_version,1.0.0,-compatibility_version,1.0.0" $(LDFLAGS) $(LDSOFLAGS) -o "$(prefix)/lib/$(KU_TARGET_LIB_FILENAME)" $(OBJS-$*) $(FF_EXTRALIBS)
+endif
+# 	$(call LINK,$(LDFLAGS) $(LDEXEFLAGS) $(LD_O) $(OBJS-$*) $(FF_EXTRALIBS))
 
 VERSION_SH  = $(SRC_PATH)/ffbuild/version.sh
 ifeq ($(VERSION_TRACKING),yes)

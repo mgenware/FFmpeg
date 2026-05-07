@@ -49,46 +49,46 @@
 #include "libavutil/stereo3d.h"
 #include "graph/graphprint.h"
 
-HWDevice *filter_hw_device;
+_Thread_local HWDevice *filter_hw_device;
 
-char *vstats_filename;
+_Thread_local char *vstats_filename;
 
-float dts_delta_threshold   = 10;
-float dts_error_threshold   = 3600*30;
+_Thread_local float dts_delta_threshold   = 10;
+_Thread_local float dts_error_threshold   = 3600*30;
 
 #if FFMPEG_OPT_VSYNC
-enum VideoSyncMethod video_sync_method = VSYNC_AUTO;
+_Thread_local enum VideoSyncMethod video_sync_method = VSYNC_AUTO;
 #endif
-float frame_drop_threshold = 0;
-int do_benchmark      = 0;
-int do_benchmark_all  = 0;
-int do_hex_dump       = 0;
-int do_pkt_dump       = 0;
-int copy_ts           = 0;
-int start_at_zero     = 0;
-int copy_tb           = -1;
-int debug_ts          = 0;
-int exit_on_error     = 0;
-int abort_on_flags    = 0;
-int print_stats       = -1;
-int stdin_interaction = 1;
-float max_error_rate  = 2.0/3;
-char *filter_nbthreads;
-int filter_complex_nbthreads = 0;
-int filter_buffered_frames = 0;
-int vstats_version = 2;
-int print_graphs = 0;
-char *print_graphs_file = NULL;
-char *print_graphs_format = NULL;
-int auto_conversion_filters = 1;
-int64_t stats_period = 500000;
+_Thread_local float frame_drop_threshold = 0;
+_Thread_local int do_benchmark      = 0;
+_Thread_local int do_benchmark_all  = 0;
+_Thread_local int do_hex_dump       = 0;
+_Thread_local int do_pkt_dump       = 0;
+_Thread_local int copy_ts           = 0;
+_Thread_local int start_at_zero     = 0;
+_Thread_local int copy_tb           = -1;
+_Thread_local int debug_ts          = 0;
+_Thread_local int exit_on_error     = 0;
+_Thread_local int abort_on_flags    = 0;
+_Thread_local int print_stats       = -1;
+_Thread_local int stdin_interaction = 1;
+_Thread_local float max_error_rate  = 2.0/3;
+_Thread_local char *filter_nbthreads;
+_Thread_local int filter_complex_nbthreads = 0;
+_Thread_local int filter_buffered_frames = 0;
+_Thread_local int vstats_version = 2;
+_Thread_local int print_graphs = 0;
+_Thread_local char *print_graphs_file = NULL;
+_Thread_local char *print_graphs_format = NULL;
+_Thread_local int auto_conversion_filters = 1;
+_Thread_local int64_t stats_period = 500000;
 
 
-static int file_overwrite     = 0;
-static int no_file_overwrite  = 0;
-int ignore_unknown_streams = 0;
-int copy_unknown_streams = 0;
-int recast_media = 0;
+static _Thread_local int file_overwrite     = 0;
+static _Thread_local int no_file_overwrite  = 0;
+_Thread_local int ignore_unknown_streams = 0;
+_Thread_local int copy_unknown_streams = 0;
+_Thread_local int recast_media = 0;
 
 // this struct is passed as the optctx argument
 // to func_arg() for global options
@@ -1619,7 +1619,11 @@ static const char *const alt_qscale[]         = { "q", NULL};
 static const char *const alt_tag[]            = { "atag", "vtag", "stag", NULL };
 
 #define OFFSET(x) offsetof(OptionsContext, x)
-const OptionDef options[] = {
+_Thread_local const OptionDef *options;
+static _Thread_local OptionDef *options_buf;
+
+void mg_create_options(void) {
+const OptionDef local_options[] = {
     /* main options */
     CMDUTILS_COMMON_OPTIONS
     { "f",                      OPT_TYPE_STRING, OPT_OFFSET | OPT_INPUT | OPT_OUTPUT,
@@ -2196,3 +2200,8 @@ const OptionDef options[] = {
 
     { NULL, },
 };
+av_freep(&options_buf);
+options_buf = av_memdup(local_options, sizeof(local_options));
+av_assert0(options_buf);
+options = options_buf;
+}

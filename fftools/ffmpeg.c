@@ -89,7 +89,7 @@
 const char program_name[] = "ffmpeg";
 const int program_birth_year = 2000;
 
-FILE *vstats_file;
+_Thread_local FILE *vstats_file;
 
 typedef struct BenchmarkTimeStamps {
     int64_t real_usec;
@@ -100,28 +100,28 @@ typedef struct BenchmarkTimeStamps {
 static BenchmarkTimeStamps get_benchmark_time_stamps(void);
 static int64_t getmaxrss(void);
 
-atomic_uint nb_output_dumped = 0;
+_Thread_local atomic_uint nb_output_dumped = 0;
 
-static BenchmarkTimeStamps current_time;
-AVIOContext *progress_avio = NULL;
+static _Thread_local BenchmarkTimeStamps current_time;
+_Thread_local AVIOContext *progress_avio = NULL;
 
-InputFile   **input_files   = NULL;
-int        nb_input_files   = 0;
+_Thread_local InputFile   **input_files   = NULL;
+_Thread_local int        nb_input_files   = 0;
 
-OutputFile   **output_files   = NULL;
-int         nb_output_files   = 0;
+_Thread_local OutputFile   **output_files   = NULL;
+_Thread_local int         nb_output_files   = 0;
 
-FilterGraph **filtergraphs;
-int        nb_filtergraphs;
+_Thread_local FilterGraph **filtergraphs;
+_Thread_local int        nb_filtergraphs;
 
-Decoder     **decoders;
-int        nb_decoders;
+_Thread_local Decoder     **decoders;
+_Thread_local int        nb_decoders;
 
 #if HAVE_TERMIOS_H
 
 /* init terminal so that we can grab keys */
-static struct termios oldtty;
-static int restore_tty;
+static _Thread_local struct termios oldtty;
+static _Thread_local int restore_tty;
 #endif
 
 static void term_exit_sigsafe(void)
@@ -138,11 +138,14 @@ void term_exit(void)
     term_exit_sigsafe();
 }
 
-static volatile int received_sigterm = 0;
-static volatile int received_nb_signals = 0;
-static atomic_int transcode_init_done = 0;
-static volatile int ffmpeg_exited = 0;
-static int64_t copy_ts_first_pts = AV_NOPTS_VALUE;
+static _Thread_local volatile int received_sigterm = 0;
+static _Thread_local volatile int received_nb_signals = 0;
+static _Thread_local atomic_int transcode_init_done = 0;
+static _Thread_local volatile int ffmpeg_exited = 0;
+static _Thread_local int64_t copy_ts_first_pts = AV_NOPTS_VALUE;
+
+// MGProgress callback.
+static _Thread_local FFmpegProgressCallback mg_progress_cb = NULL;
 
 static void
 sigterm_handler(int sig)
@@ -309,7 +312,7 @@ static int decode_interrupt_cb(void *ctx)
     return received_nb_signals > atomic_load(&transcode_init_done);
 }
 
-const AVIOInterruptCB int_cb = { decode_interrupt_cb, NULL };
+const _Thread_local AVIOInterruptCB int_cb = { decode_interrupt_cb, NULL };
 
 static void ffmpeg_cleanup(int ret)
 {
@@ -585,7 +588,7 @@ static void print_report(int is_last_report, int64_t timer_start, int64_t cur_ti
     int ret;
     float t;
 
-    if (!print_stats && !is_last_report && !progress_avio)
+    if (!print_stats && !is_last_report && !progress_avio && !mg_progress_cb)
         return;
 
     if (!is_last_report) {
@@ -713,6 +716,10 @@ static void print_report(int is_last_report, int64_t timer_start, int64_t cur_ti
         fflush(stderr);
     }
     av_bprint_finalize(&buf, NULL);
+
+    if (mg_progress_cb) {
+        mg_progress_cb((const uint8_t*)buf_script.str, buf_script.len);
+    }
 
     if (progress_avio) {
         av_bprintf(&buf_script, "progress=%s\n",
@@ -978,8 +985,10 @@ static int64_t getmaxrss(void)
 #endif
 }
 
-int main(int argc, char **argv)
+static int ori_main(int argc, char **argv)
 {
+    mg_create_options();
+
     Scheduler *sch = NULL;
 
     int ret;
@@ -1055,4 +1064,35 @@ finish:
     av_log(NULL, AV_LOG_VERBOSE, "Exiting with exit code %d\n", ret);
 
     return ret;
+}
+
+struct thread_args {
+    int argc;
+    char **argv;
+    FFmpegProgressCallback progress_cb;
+    int result;
+};
+
+static void *thread_entry(void *arg) {
+    struct thread_args *targs = (struct thread_args *)arg;
+    mg_progress_cb = targs->progress_cb;
+    targs->result = ori_main(targs->argc, targs->argv);
+    return NULL;
+}
+
+int ffmpeg_run(int argc, char **argv, FFmpegProgressCallback progress_cb) {
+    pthread_t tid;
+    struct thread_args targs = { argc, argv, progress_cb, 0 };
+
+    if (pthread_create(&tid, NULL, thread_entry, &targs) != 0) {
+        perror("pthread_create");
+        return 1;
+    }
+
+    if (pthread_join(tid, NULL) != 0) {
+        perror("pthread_join");
+        return 1;
+    }
+
+    return targs.result;
 }

@@ -78,7 +78,7 @@ OUTDIRS += fftools/resources
 OUTDIRS += fftools/graph
 
 ifdef AVPROGS
-install: install-progs install-data
+# install: install-progs install-data
 endif
 
 install-progs-yes:
